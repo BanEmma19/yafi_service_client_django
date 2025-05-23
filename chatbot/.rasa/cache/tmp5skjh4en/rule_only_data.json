@@ -1,0 +1,9 @@
+{
+  "rule_only_slots": [],
+  "rule_only_loops": [
+    "commande_mauvais_etat_form",
+    "commande_non_livree_form",
+    "remboursement_form",
+    "double_facturation_form"
+  ]
+}

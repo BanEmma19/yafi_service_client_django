@@ -1,0 +1,18 @@
+{
+  "0": "annulation_commande",
+  "1": "commande_mauvais_etat",
+  "2": "commande_non_recue",
+  "3": "compte_suspendu",
+  "4": "contacter_livreur",
+  "5": "devenir_partenaire",
+  "6": "disponibilité_service",
+  "7": "double_facturation",
+  "8": "délai_livraison",
+  "9": "mode_paiement",
+  "10": "passer_commande",
+  "11": "problème_compte",
+  "12": "problème_paiement",
+  "13": "remboursement",
+  "14": "salutation",
+  "15": "suivi_commande"
+}

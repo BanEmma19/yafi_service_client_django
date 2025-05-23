@@ -1,0 +1,120 @@
+version: "3.1"
+
+stories:
+- story: salutation
+  steps:
+  - intent: salutation
+  - action: utter_salutation
+
+- story: passer une commande
+  steps:
+  - intent: passer_commande
+  - action: utter_passer_commande
+
+- story: mode de paiement
+  steps:
+  - intent: mode_paiement
+  - action: utter_mode_paiement
+
+- story: suivi de commande
+  steps:
+  - intent: suivi_commande
+  - action: utter_suivi_commande
+
+- story: délai de livraison
+  steps:
+  - intent: délai_livraison
+  - action: utter_délai_livraison
+
+- story: problème de paiement
+  steps:
+  - intent: problème_paiement
+  - action: utter_problème_paiement
+
+- story: annulation de commande
+  steps:
+  - intent: annulation_commande
+  - action: utter_annulation_commande
+
+- story: contacter un livreur
+  steps:
+  - intent: contacter_livreur
+  - action: utter_contacter_livreur
+
+- story: horaires de service
+  steps:
+  - intent: disponibilité_service
+  - action: utter_disponibilité_service
+
+- story: devenir partenaire
+  steps:
+  - intent: devenir_partenaire
+  - action: utter_devenir_partenaire
+
+- story: commande en mauvais état (formulaire)\n  This story active le formulaire pour signaler un problème de commande en mauvais état, puis désactive le form et confirme la demande\n
+  steps:
+  - intent: commande_mauvais_etat
+  - action: commande_mauvais_etat_form
+  - active_loop: commande_mauvais_etat_form
+  - slot_was_set:
+    - requested_slot: null
+  - active_loop: null
+  - action: utter_confirm_signalement
+
+- story: double facturation (formulaire)
+  steps:
+  - intent: double_facturation
+  - action: double_facturation_form
+  - active_loop: double_facturation_form
+  - slot_was_set:
+    - requested_slot: null
+  - active_loop: null
+  - action: utter_confirm_double_facturation
+
+- story: compte suspendu - cas réussi
+  steps:
+  - intent: compte_suspendu
+  - action: compte_suspendu_form
+  - active_loop: compte_suspendu_form
+  - intent: donner_email
+    entities:
+      - email_utilisateur: "valide@domaine.com"
+  - action: validate_compte_suspendu_form
+  - slot_was_set:
+      - email_utilisateur: "valide@domaine.com"
+  - action: utter_confirm_compte_suspendu
+
+- story: compte suspendu - cas invalide
+  steps:
+  - intent: compte_suspendu
+  - action: compte_suspendu_form
+  - active_loop: compte_suspendu_form
+  - intent: donner_email
+    entities:
+      - email_utilisateur: "invalide"
+  - action: validate_compte_suspendu_form
+  - slot_was_set:
+      - email_utilisateur: null
+  - action: utter_email_invalide
+  - action: compte_suspendu_form
+  - active_loop: compte_suspendu_form
+
+- story: commande non livree (formulaire)
+  steps:
+  - intent: commande_non_livree
+  - action: commande_non_livree_form
+  - active_loop: commande_non_livree_form
+  - slot_was_set:
+    - requested_slot: null
+  - active_loop: null
+  - action: utter_confirm_commande_non_livree
+
+- story: remboursement (formulaire)
+  steps:
+  - intent: remboursement
+  - action: remboursement_form
+  - active_loop: remboursement_form
+  - slot_was_set:
+    - requested_slot: null
+  - active_loop: null
+  - action: utter_confirm_remboursement

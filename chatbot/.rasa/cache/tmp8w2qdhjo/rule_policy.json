@@ -1,0 +1,25 @@
+{
+  "lookup": {
+    "rules": {},
+    "rule_only_slots": [],
+    "rule_only_loops": [],
+    "rules_for_loop_unhappy_path": {},
+    "rules_not_in_stories": [
+      "handling active loops and forms - commande_mauvais_etat_form - action_listen",
+      "handling active loops and forms - compte_suspendu_form - action_listen",
+      "handling active loops and forms - problème_compte_form - action_listen",
+      "handling active loops and forms - remboursement_form - action_listen",
+      "handling active loops and forms - compte_suspendu_form",
+      "handling active loops and forms - double_facturation_form - action_listen",
+      "handling active loops and forms - double_facturation_form",
+      "predicting default action with intent session_start",
+      "handling active loops and forms - remboursement_form",
+      "predicting default action with intent back",
+      "handling active loops and forms - commande_mauvais_etat_form",
+      "handling active loops and forms - commande_non_recue_form - action_listen",
+      "predicting default action with intent restart",
+      "handling active loops and forms - problème_compte_form",
+      "handling active loops and forms - commande_non_recue_form"
+    ]
+  }
+}
