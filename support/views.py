@@ -18,6 +18,7 @@ from .serializers import CustomTokenObtainPairSerializer
 from rest_framework import generics, permissions
 from support.models import Utilisateur
 from .permissions import IsAdmin, IsAgent, IsClient, IsAdminOrSelf
+from .notifications import send_ticket_email  # à importer en haut du fichier
 
 # ✅ 1️⃣ Ajout de la permission personnalisée pour gérer les modifications
 class IsOwnerOrAdmin(permissions.BasePermission):
@@ -121,6 +122,13 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
 
 logger = logging.getLogger(__name__)
 
+from datetime import timedelta
+from django.utils import timezone
+from django.db.models import Q
+
+
+
+
 class TicketViewSet(viewsets.ModelViewSet):
     queryset = Ticket.objects.all()
     serializer_class = TicketSerializer
@@ -129,7 +137,7 @@ class TicketViewSet(viewsets.ModelViewSet):
         if self.action in ['create_ticket_chatbot']:
             return [IsAuthenticated()]
         elif self.action in ['update', 'partial_update', 'destroy']:
-            return [IsAgent()]
+            return [IsAuthenticated()]
         elif self.action in ['list', 'retrieve']:
             return [IsAuthenticated()]
         return [IsAuthenticated()]
@@ -138,15 +146,18 @@ class TicketViewSet(viewsets.ModelViewSet):
         ticket = serializer.save()
         logger.warning("[perform_create] Ticket créé via perform_create() pour : %s", ticket)
         self._broadcast_ticket("created", ticket)
+        send_ticket_email("created", ticket)
 
     def perform_update(self, serializer):
         ticket = serializer.save()
         logger.info("[perform_update] Ticket mis à jour : %s", ticket)
         self._broadcast_ticket("updated", ticket)
+        send_ticket_email("updated", ticket)
 
     def perform_destroy(self, instance):
         logger.info("[perform_destroy] Ticket supprimé : %s", instance)
         self._broadcast_ticket("deleted", instance)
+        send_ticket_email("deleted", instance)
         instance.delete()
 
     def _broadcast_ticket(self, action, ticket):
@@ -166,7 +177,6 @@ class TicketViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], url_path='create', permission_classes=[IsAuthenticated])
     def create_ticket_chatbot(self, request):
-        """Endpoint appelé par le chatbot pour créer un ticket."""
         user = request.user
         logger.warning("[create_ticket_chatbot] Requête reçue de : %s", user)
 
@@ -179,16 +189,13 @@ class TicketViewSet(viewsets.ModelViewSet):
         if not titre or not description:
             raise ValidationError("Le titre et la description sont obligatoires.")
 
-        # Rechercher l’agent avec le moins de tickets assignés
-        agent_le_moins_charge = Utilisateur.objects.filter(role='agent')\
-            .annotate(nb_tickets=Count('tickets_agent'))\
-            .order_by('nb_tickets')\
+        agent_le_moins_charge = Utilisateur.objects.filter(role='agent') \
+            .annotate(nb_tickets=Count('tickets_agent')) \
+            .order_by('nb_tickets') \
             .first()
 
         if not agent_le_moins_charge:
             raise ValidationError("Aucun agent disponible pour assignation.")
-
-        logger.warning("[create_ticket_chatbot] Agent assigné : %s", agent_le_moins_charge)
 
         ticket = Ticket.objects.create(
             titre=titre,
@@ -198,9 +205,8 @@ class TicketViewSet(viewsets.ModelViewSet):
             agent=agent_le_moins_charge
         )
 
-        logger.warning("[create_ticket_chatbot] Ticket ID %s créé pour %s", ticket.id, user)
-
         self._broadcast_ticket("created", ticket)
+        send_ticket_email("created", ticket)
 
         return Response({
             "titre": ticket.titre,
@@ -213,36 +219,52 @@ class TicketViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], url_path='mes-tickets', permission_classes=[IsAuthenticated])
     def mes_tickets(self, request):
-        """Retourne uniquement les tickets du client connecté."""
         user = request.user
         if user.role != 'client':
             raise PermissionDenied("Seuls les clients peuvent accéder à leurs tickets.")
 
-        tickets = Ticket.objects.filter(client=user).order_by('-date_creation')
+        seuil = timezone.now() - timedelta(days=10)
+        tickets = Ticket.objects.filter(
+            client=user
+        ).filter(
+            Q(statut__in=["Assigné", "En cours"]) |
+            Q(statut__in=["Résolu", "Rejeté"], date_modification__gte=seuil)
+        ).order_by('-date_creation')
+
         serializer = self.get_serializer(tickets, many=True)
         return Response(serializer.data)
 
-    from rest_framework.decorators import action
-    from rest_framework.response import Response
-    from rest_framework.exceptions import PermissionDenied
-    from django.db.models import Count
-
-    # ... déjà dans ta classe TicketViewSet
-
     @action(detail=False, methods=['get'], url_path='agent', permission_classes=[IsAuthenticated])
     def tickets_agent(self, request):
-        """Retourne les tickets assignés à l’agent connecté."""
         user = request.user
         if user.role != 'agent':
             raise PermissionDenied("Seuls les agents peuvent accéder à leurs tickets.")
 
-        tickets = Ticket.objects.filter(agent=user).order_by('-date_creation')
+        seuil = timezone.now() - timedelta(days=10)
+        tickets = Ticket.objects.filter(
+            agent=user
+        ).filter(
+            Q(statut__in=["Assigné", "En cours"]) |
+            Q(statut__in=["Résolu", "Rejeté"], date_modification__gte=seuil)
+        ).order_by('-date_creation')
+
         serializer = self.get_serializer(tickets, many=True)
+        return Response(serializer.data)
+
+    def list(self, request, *args, **kwargs):
+        user = request.user
+        seuil = timezone.now() - timedelta(days=10)
+
+        queryset = Ticket.objects.filter(
+            Q(statut__in=["Assigné", "En cours"]) |
+            Q(statut__in=["Résolu", "Rejeté"], date_modification__gte=seuil)
+        ).order_by('-date_creation')
+
+        serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
     @action(detail=True, methods=['patch'], url_path='changer-statut', permission_classes=[IsAuthenticated])
     def changer_statut(self, request, pk=None):
-        """Permet à un agent de changer le statut d’un ticket qui lui est assigné."""
         user = request.user
         if user.role != 'agent':
             raise PermissionDenied("Seuls les agents peuvent modifier le statut d’un ticket.")
@@ -259,9 +281,11 @@ class TicketViewSet(viewsets.ModelViewSet):
         ticket.statut = nouveau_statut
         ticket.save()
         self._broadcast_ticket("updated", ticket)
+        send_ticket_email("updated", ticket)
 
         serializer = self.get_serializer(ticket)
         return Response(serializer.data)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

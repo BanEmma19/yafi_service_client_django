@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/5.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
-
+import os
 from pathlib import Path
 from datetime import timedelta
 
@@ -27,7 +27,35 @@ SECRET_KEY = 'django-insecure-j_c4-d@d&r!8*rm%f66krkq1u6r&&znn919npzp_xf$j3968o3
 DEBUG = True
 
 ALLOWED_HOSTS = ['*']
+# Adresse email d’envoi par défaut
 
+
+# Backend d’email : exemple avec console pour dev, à changer en prod
+#EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+from dotenv import load_dotenv
+
+load_dotenv()
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = os.environ.get('EMAIL_HOST')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS') == "True"
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL')  # stocké en .env ou variables d'env
+
+SENDGRID_SANDBOX_MODE_IN_DEBUG = False  # False pour envoyer réellement les mails
+SENDGRID_ECHO_TO_STDOUT = False
+
+#DEFAULT_FROM_EMAIL = "noreply@yafi.com"
+
+# Pour envoyer de vrais mails via SMTP (exemple Gmail)
+# EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+# EMAIL_HOST = "smtp.gmail.com"
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = "ton.email@gmail.com"
+# EMAIL_HOST_PASSWORD = "ton_mot_de_passe_app"
 
 # Application definition
 
@@ -97,7 +125,7 @@ ROOT_URLCONF = 'backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / "templates"],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
