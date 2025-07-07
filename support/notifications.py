@@ -74,6 +74,8 @@ def send_ticket_email(action, ticket):
         ...
         sms_message = f"🗑️ Votre ticket YaFi service client '{ticket.titre}' a été supprimé."
 
+
+
     def format_telephone_cameroon(phone_number: str) -> str:
             phone_number = phone_number.strip()
 
@@ -123,3 +125,28 @@ def send_sms(to_number, message):
         logger.info(f"SMS envoyé à {to_number}")
     except Exception as e:
         logger.error(f"Erreur lors de l'envoi du SMS : {e}")
+
+def envoyer_code_reinit(user, code):
+        """
+        Envoie un email avec le code de réinitialisation de mot de passe à l'utilisateur.
+        """
+        subject = "[YaFi] Réinitialisation de votre mot de passe"
+        html_message = render_to_string("emails/password_reset_code.html", {
+            "user": user,
+            "code": code
+        })
+        message = strip_tags(html_message)
+        recipient_list = [user.email]
+
+        try:
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=recipient_list,
+                html_message=html_message,
+                fail_silently=False,
+            )
+            logger.info(f"Email de code de réinitialisation envoyé à {user.email}")
+        except Exception as e:
+            logger.error(f"Erreur lors de l'envoi de l'email de réinitialisation : {e}")

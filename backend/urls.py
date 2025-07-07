@@ -19,7 +19,8 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenRefreshView
 from support.views import CustomTokenObtainPairView, UtilisateurViewSet, TicketViewSet, MessageViewSet, \
-    agent_dashboard_stats, admin_agent_stats, admin_global_stats, generate_agents_report_data
+    agent_dashboard_stats, admin_agent_stats, admin_global_stats, generate_agents_report_data, PasswordResetConfirmView, \
+    PasswordResetRequestView
 
 # Création d'un router pour gérer automatiquement les routes des ViewSets
 router = DefaultRouter()
@@ -37,6 +38,8 @@ urlpatterns = [
     path('api/admin/agent-stats/<int:agent_id>/', admin_agent_stats, name='agent-stats'),
     path('api/admin/global-stats/', admin_global_stats, name='admin-stats'),
     path('api/admin/rapport-agents/', generate_agents_report_data, name='generate_agents_report'),
+    path('api/reset-password/request/', PasswordResetRequestView.as_view(), name='reset-password-request'),
+    path('api/reset-password/confirm/', PasswordResetConfirmView.as_view(), name='reset-password-confirm'),
 
     path('api/', include(router.urls)),  # Toutes les routes sont gérées ici
 ]

@@ -69,9 +69,8 @@ INSTALLED_APPS = [
     'django_extensions',
     'rest_framework',
     'corsheaders',
-    'channels',
     'support',  # Notre application principale
-    'chatbot'
+
 ]
 
 REST_FRAMEWORK = {
@@ -140,14 +139,7 @@ TEMPLATES = [
 
 ASGI_APPLICATION = "backend.asgi.application"
 
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
-        },
-    },
-}
+
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases

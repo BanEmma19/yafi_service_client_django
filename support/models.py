@@ -44,7 +44,7 @@ class Utilisateur(AbstractBaseUser, PermissionsMixin):
     user_permissions = models.ManyToManyField("auth.Permission", related_name="utilisateur_permissions", blank=True)
 
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['nom', 'role']
+    REQUIRED_FIELDS = ['nom', 'role', 'telephone']
 
     objects = UtilisateurManager()
 
@@ -54,6 +54,8 @@ class Utilisateur(AbstractBaseUser, PermissionsMixin):
     def save(self, *args, **kwargs):
         # Supprime la logique de hachage ici (déjà gérée par create_user/set_password)
         super().save(*args, **kwargs)
+
+
 
 
 class Ticket(models.Model):
@@ -90,3 +92,20 @@ class Message(models.Model):
     contenu = models.TextField()
     auteur = models.ForeignKey(Utilisateur, on_delete=models.CASCADE)  # L'auteur est un utilisateur (client ou agent)
     date_envoi = models.DateTimeField(auto_now_add=True)
+
+
+import uuid
+from datetime import timedelta
+from django.utils import timezone
+
+class ResetPasswordCode(models.Model):
+    utilisateur = models.ForeignKey(Utilisateur, on_delete=models.CASCADE, related_name='reset_codes')
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_expired(self):
+        return timezone.now() > self.created_at + timedelta(minutes=10)  # code valide 10 min
+
+    def __str__(self):
+        return f"Code pour {self.utilisateur.email} - {self.code}"
+

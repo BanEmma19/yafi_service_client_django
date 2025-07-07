@@ -1,5 +1,6 @@
 import logging
 from collections import Counter
+import random
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
@@ -10,17 +11,19 @@ from rest_framework.decorators import api_view, action, permission_classes
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from .models import Ticket, Message
-from .serializers import TicketSerializer, MessageSerializer, UtilisateurSerializer
+from .models import Ticket, Message, ResetPasswordCode
+from .serializers import TicketSerializer, MessageSerializer, UtilisateurSerializer, ResetPasswordCodeSerializer
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import CustomTokenObtainPairSerializer
 from rest_framework import generics, permissions
 from support.models import Utilisateur
 from .permissions import IsAdmin, IsAgent, IsClient, IsAdminOrSelf
 from .notifications import send_ticket_email  # à importer en haut du fichier
+from .notifications import envoyer_code_reinit
 
-# ✅ 1️⃣ Ajout de la permission personnalisée pour gérer les modifications
+# Ajout de la permission personnalisée pour gérer les modifications
 class IsOwnerOrAdmin(permissions.BasePermission):
     """
     - Un client peut modifier uniquement son propre compte.
@@ -42,7 +45,7 @@ class IsOwnerOrAdmin(permissions.BasePermission):
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
-# ✅ 2️⃣ Correction des permissions pour UtilisateurViewSet
+# Correction des permissions pour UtilisateurViewSet
 class UtilisateurViewSet(viewsets.ModelViewSet):
     queryset = Utilisateur.objects.all()
     serializer_class = UtilisateurSerializer
@@ -145,35 +148,17 @@ class TicketViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         ticket = serializer.save()
         logger.warning("[perform_create] Ticket créé via perform_create() pour : %s", ticket)
-        self._broadcast_ticket("created", ticket)
         send_ticket_email("created", ticket)
 
     def perform_update(self, serializer):
         ticket = serializer.save()
         logger.info("[perform_update] Ticket mis à jour : %s", ticket)
-        self._broadcast_ticket("updated", ticket)
         send_ticket_email("updated", ticket)
 
     def perform_destroy(self, instance):
         logger.info("[perform_destroy] Ticket supprimé : %s", instance)
-        self._broadcast_ticket("deleted", instance)
         send_ticket_email("deleted", instance)
         instance.delete()
-
-    def _broadcast_ticket(self, action, ticket):
-        channel_layer = get_channel_layer()
-        data = TicketSerializer(ticket).data
-        logger.info("[broadcast] Action : %s | Ticket ID : %s", action, ticket.id)
-        async_to_sync(channel_layer.group_send)(
-            "tickets",
-            {
-                "type": "ticket_update",
-                "content": {
-                    "action": action,
-                    "ticket": data
-                }
-            }
-        )
 
     @action(detail=False, methods=['post'], url_path='create', permission_classes=[IsAuthenticated])
     def create_ticket_chatbot(self, request):
@@ -205,7 +190,6 @@ class TicketViewSet(viewsets.ModelViewSet):
             agent=agent_le_moins_charge
         )
 
-        self._broadcast_ticket("created", ticket)
         send_ticket_email("created", ticket)
 
         return Response({
@@ -280,11 +264,11 @@ class TicketViewSet(viewsets.ModelViewSet):
 
         ticket.statut = nouveau_statut
         ticket.save()
-        self._broadcast_ticket("updated", ticket)
         send_ticket_email("updated", ticket)
 
         serializer = self.get_serializer(ticket)
         return Response(serializer.data)
+
 
 
 @api_view(['GET'])
@@ -413,7 +397,7 @@ def admin_global_stats(request):
     most_common_intent = Counter(intents).most_common(1)
     most_frequent_intent = most_common_intent[0][0] if most_common_intent else None
 
-    # ✅ Ajout du nombre total d'agents
+    # Ajout du nombre total d'agents
     User = get_user_model()
     total_agents = User.objects.filter(role='agent').count()  # Modifie selon ta logique
 
@@ -562,7 +546,7 @@ def generate_comment(delta):
 
 
 
-# ✅ 4️⃣ Ajout des permissions pour MessageViewSet
+# Ajout des permissions pour MessageViewSet
 class MessageViewSet(viewsets.ModelViewSet):
     queryset = Message.objects.all()
     serializer_class = MessageSerializer
@@ -579,3 +563,58 @@ class MessageViewSet(viewsets.ModelViewSet):
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]
 
+class PasswordResetRequestView(APIView):
+    def post(self, request):
+        email = request.data.get('email')
+        if not email:
+            return Response({"error": "Email requis"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = Utilisateur.objects.get(email=email)
+        except Utilisateur.DoesNotExist:
+            return Response({"message": "Si cet email existe, un code a été envoyé."})
+
+        code = f"{random.randint(100000, 999999)}"
+
+        ResetPasswordCode.objects.update_or_create(
+            utilisateur=user,
+            defaults={
+                "code": code,
+                "created_at": timezone.now()
+            }
+        )
+
+        envoyer_code_reinit(user, code)
+
+        return Response({"message": "Si cet email existe, un code a été envoyé."})
+
+
+class PasswordResetConfirmView(APIView):
+    def post(self, request):
+        serializer = ResetPasswordCodeSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        email = serializer.validated_data['email']
+        code = serializer.validated_data['code']
+        new_password = serializer.validated_data['new_password']
+
+        try:
+            user = Utilisateur.objects.get(email=email)
+        except Utilisateur.DoesNotExist:
+            return Response({"error": "Email invalide."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            reset_code = ResetPasswordCode.objects.get(utilisateur=user, code=code)
+        except ResetPasswordCode.DoesNotExist:
+            return Response({"error": "Code invalide."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if reset_code.is_expired():
+            return Response({"error": "Code expiré."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save()
+
+        reset_code.delete()
+
+        return Response({"message": "Mot de passe réinitialisé avec succès."})
