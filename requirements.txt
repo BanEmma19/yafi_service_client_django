@@ -1,7 +1,7 @@
 # ============ Backend essentials ============
 Django>=5.1,<5.2
 djangorestframework>=3.16,<3.17
-rest_framework_simplejwt>=5.5,<5.6
+djangorestframework_simplejwt>=5.0,<6.0
 psycopg2-binary>=2.9,<2.10
 django-cors-headers>=4.7,<4.8
 django-extensions>=4.1,<4.2
