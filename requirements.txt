@@ -18,6 +18,8 @@ asgiref>=3.8,<4.0
 # ============ Utilities & Support ============
 python-dotenv>=1.1,<1.2
 dj-database-url>=3.0,<3.1
+twilio
+
 
 # ============ Remove heavy ML libs for now ============
 # tensorflow and related removed to avoid build errors
